@@ -1,24 +1,25 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { getEntries, saveEntry, clearAllEntries, deleteEntryById } from './services/storageService';
+import { getEntries, saveEntry, clearAllEntries, deleteEntryById, getDailyGoal, saveDailyGoal } from './services/storageService';
 import { WaterEntry } from './types';
-import { StatsCard } from './components/StatsCard';
-import { IntakeForm } from './components/IntakeForm';
-import { ChartsSection } from './components/ChartsSection';
-import { HistoryList } from './components/HistoryList';
-import { Droplets, Calendar, Activity, TrendingUp, Trash2 } from 'lucide-react';
-import { v4 as uuidv4 } from 'uuid'; // Actually, we'll use a simple random string for id to avoid deps if possible, but standard practice suggests uuid. I'll use a simple generator function in the handler to keep it dependency-free as requested by "minimal/handful of files".
+import { Dashboard } from './components/Dashboard';
+import { StatsView } from './components/StatsView';
+import { Settings } from './components/Settings';
+import { Droplets, LayoutDashboard, BarChart2, Settings as SettingsIcon } from 'lucide-react';
 
-// Simple ID generator to avoid external dependency for just this
+// Simple ID generator
 const generateId = () => Math.random().toString(36).substring(2, 9);
 
-const DAILY_GOAL = 8; // Liters
+type ViewState = 'dashboard' | 'stats' | 'settings';
 
 function App() {
   const [entries, setEntries] = useState<WaterEntry[]>([]);
   const [mounted, setMounted] = useState(false);
+  const [currentView, setCurrentView] = useState<ViewState>('dashboard');
+  const [dailyGoal, setDailyGoal] = useState<number>(2.5);
 
   useEffect(() => {
     setEntries(getEntries());
+    setDailyGoal(getDailyGoal());
     setMounted(true);
   }, []);
 
@@ -43,7 +44,14 @@ function App() {
     if (window.confirm('Are you sure you want to clear ALL data? This cannot be undone.')) {
       clearAllEntries();
       setEntries([]);
+      alert('Data cleared successfully.');
     }
+  };
+
+  const handleUpdateGoal = (newGoal: number) => {
+    setDailyGoal(newGoal);
+    saveDailyGoal(newGoal);
+    alert('Goal updated successfully!');
   };
 
   // --- Statistics Calculation ---
@@ -54,7 +62,7 @@ function App() {
     // Today's Total
     const todayEntries = entries.filter(e => new Date(e.timestamp).toISOString().split('T')[0] === todayStr);
     const todayTotal = todayEntries.reduce((acc, curr) => acc + curr.amount, 0);
-    const todayPercentage = Math.min(Math.round((todayTotal / DAILY_GOAL) * 100), 100);
+    const todayPercentage = Math.round((todayTotal / dailyGoal) * 100);
 
     // Current Week Total
     const startOfWeek = new Date(now);
@@ -65,9 +73,7 @@ function App() {
         .filter(e => e.timestamp >= startOfWeek.getTime())
         .reduce((acc, curr) => acc + curr.amount, 0);
 
-    // This Week's Daily Average (Simple: last 7 days total / 7)
-    // Or stricter: Average of days with entries? Prompt says "This week's average daily intake".
-    // I'll calculate average over the days that have passed in the current week (Sunday to Now).
+    // This Week's Daily Average
     const daysPassedInWeek = now.getDay() + 1; 
     const weekAvg = daysPassedInWeek > 0 ? (currentWeekTotal / daysPassedInWeek) : 0;
 
@@ -87,14 +93,14 @@ function App() {
         monthTotal,
         currentWeekTotal
     };
-  }, [entries]);
+  }, [entries, dailyGoal]);
 
   if (!mounted) return null;
 
   return (
-    <div className="min-h-screen bg-slate-50 pb-20">
+    <div className="min-h-screen bg-slate-50 flex flex-col">
       {/* Header */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-10">
+      <header className="bg-white border-b border-slate-200 sticky top-0 z-20">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="bg-primary-500 p-2 rounded-lg text-white">
@@ -102,81 +108,86 @@ function App() {
             </div>
             <h1 className="text-xl font-bold text-slate-800 tracking-tight">HydroTrack</h1>
           </div>
-          <button 
-            onClick={handleClearData}
-            className="text-slate-400 hover:text-red-500 text-sm font-medium transition-colors flex items-center gap-1"
-          >
-            <Trash2 size={16} />
-            <span className="hidden sm:inline">Clear Data</span>
-          </button>
+          
+          {/* Desktop Navigation */}
+          <nav className="hidden sm:flex gap-1">
+            <button 
+              onClick={() => setCurrentView('dashboard')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${currentView === 'dashboard' ? 'bg-primary-50 text-primary-600' : 'text-slate-600 hover:bg-slate-50'}`}
+            >
+              <LayoutDashboard size={18} />
+              Dashboard
+            </button>
+            <button 
+              onClick={() => setCurrentView('stats')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${currentView === 'stats' ? 'bg-primary-50 text-primary-600' : 'text-slate-600 hover:bg-slate-50'}`}
+            >
+              <BarChart2 size={18} />
+              Stats
+            </button>
+            <button 
+              onClick={() => setCurrentView('settings')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${currentView === 'settings' ? 'bg-primary-50 text-primary-600' : 'text-slate-600 hover:bg-slate-50'}`}
+            >
+              <SettingsIcon size={18} />
+              Settings
+            </button>
+          </nav>
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
-        {/* Top Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <StatsCard 
-            title="Today's Intake" 
-            value={`${stats.todayTotal.toFixed(2)} L`}
-            subValue={`${stats.todayPercentage}% of 8L Goal`}
-            icon={Droplets}
-            colorClass="bg-blue-50 text-blue-600"
+      <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 py-8">
+        {currentView === 'dashboard' && (
+          <Dashboard 
+            stats={stats} 
+            entries={entries} 
+            onAdd={handleAddEntry} 
+            onDelete={handleDeleteEntry}
+            goal={dailyGoal}
           />
-          <StatsCard 
-            title="Week Average" 
-            value={`${stats.weekAvg.toFixed(2)} L`}
-            subValue="Per day this week"
-            icon={Activity}
-            colorClass="bg-purple-50 text-purple-600"
+        )}
+        {currentView === 'stats' && (
+          <StatsView 
+            stats={stats} 
+            entries={entries}
+            goal={dailyGoal}
           />
-          <StatsCard 
-            title="Month Total" 
-            value={`${stats.monthTotal.toFixed(1)} L`}
-            subValue="Current calendar month"
-            icon={Calendar}
-            colorClass="bg-emerald-50 text-emerald-600"
+        )}
+        {currentView === 'settings' && (
+          <Settings 
+            currentGoal={dailyGoal}
+            onUpdateGoal={handleUpdateGoal}
+            onClearData={handleClearData}
           />
-           <StatsCard 
-            title="Week Total" 
-            value={`${stats.currentWeekTotal.toFixed(1)} L`}
-            subValue="Since Sunday"
-            icon={TrendingUp}
-            colorClass="bg-orange-50 text-orange-600"
-          />
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left Column: Input and History */}
-          <div className="lg:col-span-1 space-y-6">
-            <IntakeForm onAdd={handleAddEntry} />
-            <HistoryList entries={entries} onDelete={handleDeleteEntry} />
-          </div>
-
-          {/* Right Column: Charts */}
-          <div className="lg:col-span-2">
-             <ChartsSection entries={entries} />
-             
-             {/* Progress Bar Component Inline */}
-             <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
-                <div className="flex justify-between items-end mb-2">
-                    <h3 className="font-semibold text-slate-800">Today's Goal Progress</h3>
-                    <span className="text-sm font-medium text-slate-500">{stats.todayTotal.toFixed(1)} / {DAILY_GOAL} L</span>
-                </div>
-                <div className="w-full bg-slate-100 rounded-full h-4 overflow-hidden">
-                    <div 
-                        className="bg-primary-500 h-4 rounded-full transition-all duration-500 ease-out relative"
-                        style={{ width: `${stats.todayPercentage}%` }}
-                    >
-                         <div className="absolute inset-0 bg-white/20 animate-pulse"></div>
-                    </div>
-                </div>
-                <p className="text-xs text-slate-400 mt-2 text-center">
-                    {stats.todayPercentage >= 100 ? "🎉 Goal reached! Great job!" : "Keep drinking! You're doing great."}
-                </p>
-             </div>
-          </div>
-        </div>
+        )}
       </main>
+
+      {/* Mobile Navigation Bar (Fixed Bottom) */}
+      <nav className="sm:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 pb-safe z-30">
+        <div className="flex justify-around items-center h-16">
+           <button 
+              onClick={() => setCurrentView('dashboard')}
+              className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${currentView === 'dashboard' ? 'text-primary-600' : 'text-slate-400'}`}
+            >
+              <LayoutDashboard size={20} />
+              <span className="text-[10px] font-medium">Dashboard</span>
+            </button>
+            <button 
+              onClick={() => setCurrentView('stats')}
+              className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${currentView === 'stats' ? 'text-primary-600' : 'text-slate-400'}`}
+            >
+              <BarChart2 size={20} />
+              <span className="text-[10px] font-medium">Stats</span>
+            </button>
+            <button 
+              onClick={() => setCurrentView('settings')}
+              className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${currentView === 'settings' ? 'text-primary-600' : 'text-slate-400'}`}
+            >
+              <SettingsIcon size={20} />
+              <span className="text-[10px] font-medium">Settings</span>
+            </button>
+        </div>
+      </nav>
     </div>
   );
 }
