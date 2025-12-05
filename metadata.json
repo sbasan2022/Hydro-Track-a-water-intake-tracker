@@ -1,0 +1,5 @@
+{
+  "name": "HydroTrack",
+  "description": "A minimalist, client-side water intake tracker with real-time analytics and visualizations.",
+  "requestFramePermissions": []
+}
