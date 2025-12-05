@@ -23,3 +23,10 @@ export interface PlantStats {
   height: number; // in cm
   lastGrowthDate: string; // YYYY-MM-DD
 }
+
+export interface AutoLogConfig {
+  startTime: string; // "HH:MM"
+  endTime: string; // "HH:MM"
+  enabled: boolean;
+  lastLogTimestamp: number;
+}

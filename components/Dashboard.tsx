@@ -1,6 +1,6 @@
 import React from 'react';
-import { WaterEntry, PlantStats } from '../types';
-import { IntakeForm } from './IntakeForm';
+import { WaterEntry, PlantStats, AutoLogConfig } from '../types';
+import { AutoLogger } from './AutoLogger';
 import { HistoryList } from './HistoryList';
 import { PlantGarden } from './PlantGarden';
 import { Trophy, Star } from 'lucide-react';
@@ -16,9 +16,21 @@ interface DashboardProps {
   goal: number;
   plantStats: PlantStats;
   justGrew: boolean;
+  autoLogConfig: AutoLogConfig;
+  onUpdateAutoLog: (config: AutoLogConfig) => void;
 }
 
-export const Dashboard: React.FC<DashboardProps> = ({ stats, entries, onAdd, onDelete, goal, plantStats, justGrew }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ 
+  stats, 
+  entries, 
+  onAdd, 
+  onDelete, 
+  goal, 
+  plantStats, 
+  justGrew,
+  autoLogConfig,
+  onUpdateAutoLog
+}) => {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
       {/* Left Column: Input and Stats Summary */}
@@ -73,7 +85,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ stats, entries, onAdd, onD
             )}
         </div>
 
-        <IntakeForm onAdd={onAdd} />
+        {/* Auto Logger Configuration (Replaces Manual Form) */}
+        <AutoLogger config={autoLogConfig} onUpdateConfig={onUpdateAutoLog} />
       </div>
 
       {/* Right Column: History and Garden */}

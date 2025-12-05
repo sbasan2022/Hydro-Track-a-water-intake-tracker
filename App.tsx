@@ -1,6 +1,10 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { getEntries, saveEntry, clearAllEntries, deleteEntryById, getDailyGoal, saveDailyGoal, getPlantStats, savePlantStats } from './services/storageService';
-import { WaterEntry, PlantStats } from './types';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { 
+  getEntries, saveEntry, clearAllEntries, deleteEntryById, 
+  getDailyGoal, saveDailyGoal, getPlantStats, savePlantStats,
+  getAutoLogConfig, saveAutoLogConfig 
+} from './services/storageService';
+import { WaterEntry, PlantStats, AutoLogConfig } from './types';
 import { Dashboard } from './components/Dashboard';
 import { StatsView } from './components/StatsView';
 import { Settings } from './components/Settings';
@@ -15,6 +19,10 @@ type ViewState = 'dashboard' | 'stats' | 'settings' | 'chat';
 function App() {
   const [entries, setEntries] = useState<WaterEntry[]>([]);
   const [plantStats, setPlantStats] = useState<PlantStats>({ height: 1, lastGrowthDate: '' });
+  const [autoLogConfig, setAutoLogConfig] = useState<AutoLogConfig>({ 
+    startTime: '09:00', endTime: '18:00', enabled: false, lastLogTimestamp: 0 
+  });
+  
   const [justGrew, setJustGrew] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [currentView, setCurrentView] = useState<ViewState>('dashboard');
@@ -24,6 +32,7 @@ function App() {
     setEntries(getEntries());
     setDailyGoal(getDailyGoal());
     setPlantStats(getPlantStats());
+    setAutoLogConfig(getAutoLogConfig());
     setMounted(true);
   }, []);
 
@@ -36,6 +45,64 @@ function App() {
     const updated = saveEntry(newEntry);
     setEntries(updated);
   };
+
+  const handleUpdateAutoLog = (newConfig: AutoLogConfig) => {
+    setAutoLogConfig(newConfig);
+    saveAutoLogConfig(newConfig);
+  };
+
+  // --- Auto-Logging Logic ---
+  useEffect(() => {
+    if (!mounted || !autoLogConfig.enabled) return;
+
+    const checkAutoLog = () => {
+      const now = new Date();
+      const currentH = now.getHours();
+      const currentM = now.getMinutes();
+      const currentTotalM = currentH * 60 + currentM;
+
+      const [startH, startM] = autoLogConfig.startTime.split(':').map(Number);
+      const startTotalM = startH * 60 + startM;
+
+      const [endH, endM] = autoLogConfig.endTime.split(':').map(Number);
+      const endTotalM = endH * 60 + endM;
+
+      // Check if within time window
+      if (currentTotalM >= startTotalM && currentTotalM <= endTotalM) {
+        const lastLogDate = new Date(autoLogConfig.lastLogTimestamp);
+        const isSameDay = lastLogDate.getDate() === now.getDate() && 
+                          lastLogDate.getMonth() === now.getMonth() && 
+                          lastLogDate.getFullYear() === now.getFullYear();
+
+        const oneHour = 3600000; // ms
+        
+        let shouldLog = false;
+
+        // If never logged today, or if last log was over an hour ago
+        if (!isSameDay) {
+          shouldLog = true;
+        } else if ((now.getTime() - autoLogConfig.lastLogTimestamp) >= oneHour) {
+          shouldLog = true;
+        }
+
+        if (shouldLog) {
+          // Add 200ml (0.2L)
+          handleAddEntry(0.2);
+          
+          // Update timestamp
+          const updatedConfig = { ...autoLogConfig, lastLogTimestamp: now.getTime() };
+          setAutoLogConfig(updatedConfig);
+          saveAutoLogConfig(updatedConfig);
+        }
+      }
+    };
+
+    // Check immediately and then every minute
+    checkAutoLog();
+    const intervalId = setInterval(checkAutoLog, 60000);
+
+    return () => clearInterval(intervalId);
+  }, [mounted, autoLogConfig]);
 
   const handleDeleteEntry = (id: string) => {
     if (window.confirm('Are you sure you want to delete this entry?')) {
@@ -180,6 +247,8 @@ function App() {
             goal={dailyGoal}
             plantStats={plantStats}
             justGrew={justGrew}
+            autoLogConfig={autoLogConfig}
+            onUpdateAutoLog={handleUpdateAutoLog}
           />
         )}
         {currentView === 'stats' && (

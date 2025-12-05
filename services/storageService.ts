@@ -1,8 +1,9 @@
-import { WaterEntry, PlantStats } from '../types';
+import { WaterEntry, PlantStats, AutoLogConfig } from '../types';
 
 const STORAGE_KEY = 'hydrotrack_entries';
 const GOAL_KEY = 'hydrotrack_goal';
 const PLANT_KEY = 'hydrotrack_plant';
+const AUTOLOG_KEY = 'hydrotrack_autolog';
 
 export const getEntries = (): WaterEntry[] => {
   try {
@@ -23,7 +24,9 @@ export const saveEntry = (entry: WaterEntry): WaterEntry[] => {
 
 export const clearAllEntries = (): void => {
   localStorage.removeItem(STORAGE_KEY);
-  localStorage.removeItem(PLANT_KEY); // Also clear plant on full reset
+  localStorage.removeItem(PLANT_KEY);
+  // We generally don't clear settings like Goal or AutoLog config on data clear, 
+  // but if requested we could. For now, keeping preferences is better UX.
 };
 
 export const deleteEntryById = (id: string): WaterEntry[] => {
@@ -49,7 +52,7 @@ export const saveDailyGoal = (goal: number): void => {
 export const getPlantStats = (): PlantStats => {
   try {
     const data = localStorage.getItem(PLANT_KEY);
-    return data ? JSON.parse(data) : { height: 1, lastGrowthDate: '' }; // Start at 1cm
+    return data ? JSON.parse(data) : { height: 1, lastGrowthDate: '' }; 
   } catch {
     return { height: 1, lastGrowthDate: '' };
   }
@@ -57,4 +60,23 @@ export const getPlantStats = (): PlantStats => {
 
 export const savePlantStats = (stats: PlantStats): void => {
   localStorage.setItem(PLANT_KEY, JSON.stringify(stats));
+};
+
+export const getAutoLogConfig = (): AutoLogConfig => {
+  try {
+    const data = localStorage.getItem(AUTOLOG_KEY);
+    // Default: 9am to 6pm, disabled
+    return data ? JSON.parse(data) : { 
+      startTime: '09:00', 
+      endTime: '18:00', 
+      enabled: false, 
+      lastLogTimestamp: 0 
+    };
+  } catch {
+    return { startTime: '09:00', endTime: '18:00', enabled: false, lastLogTimestamp: 0 };
+  }
+};
+
+export const saveAutoLogConfig = (config: AutoLogConfig): void => {
+  localStorage.setItem(AUTOLOG_KEY, JSON.stringify(config));
 };
