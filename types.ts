@@ -18,3 +18,8 @@ export interface MonthlyStats {
   monthLabel: string;
   total: number;
 }
+
+export interface PlantStats {
+  height: number; // in cm
+  lastGrowthDate: string; // YYYY-MM-DD
+}

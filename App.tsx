@@ -1,18 +1,21 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { getEntries, saveEntry, clearAllEntries, deleteEntryById, getDailyGoal, saveDailyGoal } from './services/storageService';
-import { WaterEntry } from './types';
+import { getEntries, saveEntry, clearAllEntries, deleteEntryById, getDailyGoal, saveDailyGoal, getPlantStats, savePlantStats } from './services/storageService';
+import { WaterEntry, PlantStats } from './types';
 import { Dashboard } from './components/Dashboard';
 import { StatsView } from './components/StatsView';
 import { Settings } from './components/Settings';
-import { Droplets, LayoutDashboard, BarChart2, Settings as SettingsIcon } from 'lucide-react';
+import { ChatBot } from './components/ChatBot';
+import { Droplets, LayoutDashboard, BarChart2, Settings as SettingsIcon, MessageCircle } from 'lucide-react';
 
 // Simple ID generator
 const generateId = () => Math.random().toString(36).substring(2, 9);
 
-type ViewState = 'dashboard' | 'stats' | 'settings';
+type ViewState = 'dashboard' | 'stats' | 'settings' | 'chat';
 
 function App() {
   const [entries, setEntries] = useState<WaterEntry[]>([]);
+  const [plantStats, setPlantStats] = useState<PlantStats>({ height: 1, lastGrowthDate: '' });
+  const [justGrew, setJustGrew] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [currentView, setCurrentView] = useState<ViewState>('dashboard');
   const [dailyGoal, setDailyGoal] = useState<number>(2.5);
@@ -20,6 +23,7 @@ function App() {
   useEffect(() => {
     setEntries(getEntries());
     setDailyGoal(getDailyGoal());
+    setPlantStats(getPlantStats());
     setMounted(true);
   }, []);
 
@@ -44,6 +48,7 @@ function App() {
     if (window.confirm('Are you sure you want to clear ALL data? This cannot be undone.')) {
       clearAllEntries();
       setEntries([]);
+      setPlantStats({ height: 1, lastGrowthDate: '' });
       alert('Data cleared successfully.');
     }
   };
@@ -95,6 +100,28 @@ function App() {
     };
   }, [entries, dailyGoal]);
 
+  // --- Plant Growth Logic ---
+  useEffect(() => {
+    if (!mounted) return;
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    const isGoalMet = stats.todayTotal >= dailyGoal;
+    const alreadyGrewToday = plantStats.lastGrowthDate === todayStr;
+
+    if (isGoalMet && !alreadyGrewToday) {
+      const newStats = {
+        height: plantStats.height + 1,
+        lastGrowthDate: todayStr
+      };
+      savePlantStats(newStats);
+      setPlantStats(newStats);
+      setJustGrew(true);
+      
+      // Reset animation flag after a few seconds
+      setTimeout(() => setJustGrew(false), 3500);
+    }
+  }, [stats.todayTotal, dailyGoal, plantStats.lastGrowthDate, mounted]);
+
   if (!mounted) return null;
 
   return (
@@ -126,6 +153,13 @@ function App() {
               Stats
             </button>
             <button 
+              onClick={() => setCurrentView('chat')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${currentView === 'chat' ? 'bg-primary-50 text-primary-600' : 'text-slate-600 hover:bg-slate-50'}`}
+            >
+              <MessageCircle size={18} />
+              AI Chat
+            </button>
+            <button 
               onClick={() => setCurrentView('settings')}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${currentView === 'settings' ? 'bg-primary-50 text-primary-600' : 'text-slate-600 hover:bg-slate-50'}`}
             >
@@ -144,6 +178,8 @@ function App() {
             onAdd={handleAddEntry} 
             onDelete={handleDeleteEntry}
             goal={dailyGoal}
+            plantStats={plantStats}
+            justGrew={justGrew}
           />
         )}
         {currentView === 'stats' && (
@@ -152,6 +188,9 @@ function App() {
             entries={entries}
             goal={dailyGoal}
           />
+        )}
+        {currentView === 'chat' && (
+          <ChatBot />
         )}
         {currentView === 'settings' && (
           <Settings 
@@ -178,6 +217,13 @@ function App() {
             >
               <BarChart2 size={20} />
               <span className="text-[10px] font-medium">Stats</span>
+            </button>
+            <button 
+              onClick={() => setCurrentView('chat')}
+              className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${currentView === 'chat' ? 'text-primary-600' : 'text-slate-400'}`}
+            >
+              <MessageCircle size={20} />
+              <span className="text-[10px] font-medium">AI Chat</span>
             </button>
             <button 
               onClick={() => setCurrentView('settings')}

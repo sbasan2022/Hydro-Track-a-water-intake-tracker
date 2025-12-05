@@ -1,7 +1,8 @@
-import { WaterEntry } from '../types';
+import { WaterEntry, PlantStats } from '../types';
 
 const STORAGE_KEY = 'hydrotrack_entries';
 const GOAL_KEY = 'hydrotrack_goal';
+const PLANT_KEY = 'hydrotrack_plant';
 
 export const getEntries = (): WaterEntry[] => {
   try {
@@ -22,6 +23,7 @@ export const saveEntry = (entry: WaterEntry): WaterEntry[] => {
 
 export const clearAllEntries = (): void => {
   localStorage.removeItem(STORAGE_KEY);
+  localStorage.removeItem(PLANT_KEY); // Also clear plant on full reset
 };
 
 export const deleteEntryById = (id: string): WaterEntry[] => {
@@ -42,4 +44,17 @@ export const getDailyGoal = (): number => {
 
 export const saveDailyGoal = (goal: number): void => {
   localStorage.setItem(GOAL_KEY, goal.toString());
+};
+
+export const getPlantStats = (): PlantStats => {
+  try {
+    const data = localStorage.getItem(PLANT_KEY);
+    return data ? JSON.parse(data) : { height: 1, lastGrowthDate: '' }; // Start at 1cm
+  } catch {
+    return { height: 1, lastGrowthDate: '' };
+  }
+};
+
+export const savePlantStats = (stats: PlantStats): void => {
+  localStorage.setItem(PLANT_KEY, JSON.stringify(stats));
 };
